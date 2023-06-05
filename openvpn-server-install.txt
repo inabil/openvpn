@@ -71,5 +71,19 @@ systemctl status openvpn-server@server
 
 ifconfig 
 
+#Add firewall rules 
+firewall-cmd --permanent --add-service=openvpn
+firewall-cmd --permanent --zone=trusted --add-service=openvpn
+firewall-cmd --permanent --zone=trusted --add-interface=tun0
+
+firewall-cmd --add-masquerade
+firewall-cmd --permanent --add-masquerade
+
+meetspaceit=$(ip route get 8.8.8.8 | awk 'NR==1 {print $(NF-2)}')
+firewall-cmd --permanent --direct --passthrough ipv4 -t nat -A POSTROUTING -s 10.8.0.0/24 -o $meetspaceit -j MASQUERADE
+
+firewall-cmd --reload
+
+
 
 REF: https://tecadmin.net/install-openvpn-centos-8/
