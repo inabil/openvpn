@@ -1,0 +1,75 @@
+nano /etc/selinux/config
+SELINUX=disabled
+
+nano /etc/sysctl.conf
+net.ipv4.ip_forward = 1
+
+sysctl -p
+
+dnf install epel-release -y
+dnf install openvpn -y
+
+#GENERATE SSL 
+cd /etc/openvpn
+wget https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.6/EasyRSA-unix-v3.0.6.tgz
+
+tar -xvzf EasyRSA-unix-v3.0.6.tgz
+mv EasyRSA-v3.0.6 easy-rsa
+
+#Setup Certificate Authority
+cd /etc/openvpn/easy-rsa
+nano vars
+
+#########################################################
+set_var EASYRSA                 "$PWD"
+set_var EASYRSA_PKI             "$EASYRSA/pki"
+set_var EASYRSA_DN              "cn_only"
+set_var EASYRSA_REQ_COUNTRY     "PAKISTAN"
+set_var EASYRSA_REQ_PROVINCE    "Punjab"
+set_var EASYRSA_REQ_CITY        "Lahore"
+set_var EASYRSA_REQ_ORG         "Meetspace CERTIFICATE AUTHORITY"
+set_var EASYRSA_REQ_EMAIL		"admin@meetspaceit.com"
+set_var EASYRSA_REQ_OU          "MeetspaceIT EASY CA"
+set_var EASYRSA_KEY_SIZE        2048
+set_var EASYRSA_ALGO            rsa
+set_var EASYRSA_CA_EXPIRE		7500
+set_var EASYRSA_CERT_EXPIRE     365
+set_var EASYRSA_NS_SUPPORT		"no"
+set_var EASYRSA_NS_COMMENT		"MeetspaceIT CERTIFICATE AUTHORITY"
+set_var EASYRSA_EXT_DIR         "$EASYRSA/x509-types"
+set_var EASYRSA_SSL_CONF        "$EASYRSA/openssl-easyrsa.cnf"
+set_var EASYRSA_DIGEST          "sha256"
+################################################################
+
+#Commands
+./easyrsa init-pki
+./easyrsa build-ca
+./easyrsa gen-req meetspaceit-server nopass
+./easyrsa sign-req server meetspaceit-server
+openssl verify -CAfile pki/ca.crt pki/issued/meetspaceit-server.crt
+./easyrsa gen-dh
+
+#Now Copy Server SSL files 
+cp pki/ca.crt /etc/openvpn/server/
+cp pki/dh.pem /etc/openvpn/server/
+cp pki/private/tecadmin-server.key /etc/openvpn/server/
+cp pki/issued/tecadmin-server.crt /etc/openvpn/server/
+
+##Generate Client Certificate and Key File
+./easyrsa gen-req ClientName nopass
+./easyrsa sign-req client ClientName
+cp pki/ca.crt /etc/openvpn/client/
+cp pki/issued/client.crt /etc/openvpn/client/
+cp pki/private/client.key /etc/openvpn/client/
+Done. 
+
+ATTENTION!!!!: Make sure you have correct server certificate paths in server.conf (check server.conf in this repository)
+
+systemctl start openvpn-server@server
+systemctl enable openvpn-server@server
+systemctl status openvpn-server@server
+
+ifconfig 
+
+
+REF: https://tecadmin.net/install-openvpn-centos-8/
